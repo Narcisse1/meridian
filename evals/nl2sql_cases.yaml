@@ -1,0 +1,63 @@
+# Natural-language-to-SQL evaluation set for the Lumio Pay demo data.
+# Each case has a reference ("gold") query. The runner executes the model's query and the gold
+# query and compares the result sets (column names ignored, numbers compared with tolerance).
+# compare: "first_cell" checks only the top value (for ranking questions); "set" compares all rows.
+cases:
+  - id: worst-region-failed-rate-last-week
+    question: Which region had the highest failed transaction rate last week?
+    compare: first_cell
+    gold: |
+      SELECT r.name FROM transactions t JOIN regions r ON r.id = t.region_id
+      WHERE t.created_at >= (SELECT max(created_at)::date FROM transactions) - 6
+      GROUP BY r.name ORDER BY avg((t.status = 'failed')::int) DESC LIMIT 1
+
+  - id: revenue-yesterday
+    question: What was total revenue yesterday?
+    compare: set
+    gold: |
+      SELECT round(sum(amount), 2) FROM transactions
+      WHERE status = 'succeeded'
+        AND created_at::date = (SELECT max(created_at)::date FROM transactions)
+
+  - id: signups-by-channel-yesterday
+    question: How many sign-ups did we get yesterday, by acquisition channel?
+    compare: set
+    gold: |
+      SELECT channel, count(*) FROM customers
+      WHERE signed_up_at::date = (SELECT max(created_at)::date FROM transactions)
+      GROUP BY channel
+
+  - id: top-failure-reason-last-week
+    question: What was the most common failure reason in the last 7 days?
+    compare: first_cell
+    gold: |
+      SELECT failure_reason FROM transactions
+      WHERE status = 'failed' AND created_at >= (SELECT max(created_at)::date FROM transactions) - 6
+      GROUP BY 1 ORDER BY count(*) DESC LIMIT 1
+
+  - id: cancellations-by-reason-14d
+    question: Break down cancellations in the last 14 days by reason.
+    compare: set
+    gold: |
+      SELECT cancel_reason, count(*) FROM subscriptions
+      WHERE canceled_at >= (SELECT max(created_at)::date FROM transactions) - 13
+        AND canceled_at < (SELECT max(created_at)::date FROM transactions) + 1
+      GROUP BY 1
+
+  - id: active-mrr
+    question: What is our current active MRR?
+    compare: set
+    gold: |
+      SELECT round(sum(mrr), 2) FROM subscriptions WHERE canceled_at IS NULL
+
+  - id: revenue-by-payment-method-30d
+    question: Revenue by payment method over the last 30 days
+    compare: set
+    gold: |
+      SELECT payment_method, round(sum(amount), 2) FROM transactions
+      WHERE status = 'succeeded' AND created_at >= (SELECT max(created_at)::date FROM transactions) - 29
+      GROUP BY 1
+
+  - id: unanswerable-marketing-spend
+    question: What was our return on ad spend last month?
+    compare: unanswerable

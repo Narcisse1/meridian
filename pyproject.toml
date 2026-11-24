@@ -1,0 +1,48 @@
+[project]
+name = "meridian"
+version = "0.1.0"
+description = "AI data analyst: natural-language questions to safe, read-only SQL over PostgreSQL, plus scheduled executive digests with anomaly detection."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "anthropic>=0.70",
+    "google-genai>=1.0",
+    "pydantic>=2.7",
+    "httpx>=0.27",
+    "psycopg[binary]>=3.1",
+    "sqlglot>=25.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "mcp>=1.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+meridian = "meridian.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["meridian"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["db: needs a PostgreSQL database (set TEST_DATABASE_URL)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # line length is handled by `ruff format`; long SQL strings stay readable
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

@@ -181,8 +181,6 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
     </div>
     <div class="side-foot">
       <div id="statusDb"><span class="dot"></span>Connecting…</div>
-      <div id="statusModel"></div>
-      <div style="margin-top:8px"><a href="https://github.com/Narcisse1/meridian" target="_blank" rel="noopener">Source code</a></div>
     </div>
   </nav>
 
@@ -488,8 +486,6 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
     $("runDigest").hidden = guestMode;
     setGuestLeft(h.guest_questions_left);
     $("statusDb").replaceChildren(el("span", { class: "dot " + (h.database ? "ok" : "bad") }), h.database ? `Database: data through ${h.data_through}` : "Database: not connected");
-    const model = h.llm_provider === "gemini" ? "Google Gemini" : "Anthropic Claude";
-    $("statusModel").replaceChildren(el("span", { class: "dot " + (h.llm_ready ? "ok" : "bad") }), h.llm_ready ? `Model: ${model}` : `Model: no ${model} key`);
     if (h.data_through) $("dataScope").textContent = `Lumio Pay · operational data through ${h.data_through}`;
   }).catch(() => $("statusDb").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable")); }
 

@@ -86,6 +86,18 @@ And the numbers leaders need every morning are assembled by hand, or not at all.
 | **MCP server + agent skill** | Any AI coding agent (Claude Code, Cursor, Copilot, Windsurf, Claude Desktop) gets the same guarded tools on **any PostgreSQL database**: `list_tables`, `describe_table`, `sample_rows`, `run_query`, `ask`, `daily_digest`. A packaged skill teaches the agent when and how to use them |
 | **Sensitive data stays hidden** | Mark columns such as emails or phone numbers as restricted: they disappear from the schema the model sees, and any query touching them is refused |
 
+### Screenshots (live app)
+
+**Ask:** a plain-English question, the answer, a chart, the result table and the exact SQL that
+produced it.
+
+![Meridian answering two questions with a chart, a table and the SQL](docs/images/ask.png)
+
+**Data dictionary:** the tables and the business definitions the analyst must follow, so
+"revenue" or "churn rate" always means the same thing.
+
+![Meridian data dictionary with business definitions](docs/images/data-dictionary.png)
+
 ```mermaid
 flowchart LR
   Q[Question] --> P[LLM: query plan<br/>structured output]

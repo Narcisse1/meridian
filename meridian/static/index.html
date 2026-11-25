@@ -462,7 +462,7 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
           el("p", { class: "lede", style: "margin-bottom:10px" }, "The analyst is instructed to compute metrics exactly this way, so the same question always means the same thing."),
           el("ul", { class: "defs" }, s.definitions.map((d) => el("li", {}, d)))),
         el("div", { class: "dict" }, s.tables.map((t) => el("div", { class: "panel pad" },
-          el("h3", {}, t.name), el("p", { class: "tcomment" }, `${t.comment} About ${t.rows.toLocaleString()} rows.`),
+          el("h3", {}, t.name), el("p", { class: "tcomment" }, t.rows > 0 ? `${t.comment} About ${t.rows.toLocaleString()} rows.` : t.comment),
           el("dl", {}, t.columns.flatMap((c) => [el("dt", {}, c.name, el("small", {}, c.type)), el("dd", {}, c.comment || "–")]))))));
     } catch (e) { $("dict").replaceChildren(el("div", { class: "panel pad" }, el("div", { class: "msg err", style: "margin:0" }, e.message))); }
   }

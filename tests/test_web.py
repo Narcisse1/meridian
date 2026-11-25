@@ -81,6 +81,63 @@ def test_access_token(monkeypatch):
     assert c.post("/api/digest/run", headers={"X-Access-Token": "s3cret"}).status_code == 200
     assert c.post("/api/digest/run?token=s3cret").status_code == 200
     assert c.get("/api/health").status_code == 200  # health stays public
+    assert c.post("/api/digest/run", headers={"X-Access-Token": "nope"}).status_code == 401
+
+
+Q = {"question": "Which region had the highest failed rate last week?"}
+
+
+def test_guests_can_ask_within_quota(monkeypatch):
+    monkeypatch.setenv("MERIDIAN_ACCESS_TOKEN", "s3cret")
+    monkeypatch.setenv("MERIDIAN_GUEST_QUESTIONS_PER_VISITOR", "2")
+    c = client()
+    health = c.get("/api/health").json()
+    assert health["guest_access"] and not health["token_required"]
+    assert health["guest_questions_left"] == 2
+    r = c.post("/api/ask", json=Q)
+    assert r.status_code == 200 and r.json()["guest_questions_left"] == 1
+    assert c.post("/api/ask", json=Q).status_code == 200
+    blocked = c.post("/api/ask", json=Q)
+    assert blocked.status_code == 429 and "2 questions" in blocked.json()["detail"]
+    # The owner is never limited by the guest quota.
+    owner = c.post("/api/ask", json=Q, headers={"X-Access-Token": "s3cret"})
+    assert owner.status_code == 200 and "guest_questions_left" not in owner.json()
+    # Another visitor has their own allowance.
+    other = c.post("/api/ask", json=Q, headers={"X-Forwarded-For": "203.0.113.9"})
+    assert other.status_code == 200
+
+
+def test_guests_read_but_cannot_run_digest(monkeypatch):
+    monkeypatch.setenv("MERIDIAN_ACCESS_TOKEN", "s3cret")
+    c = client()
+    assert c.post("/api/digest/run").status_code == 401
+    assert c.get("/api/digest/latest").status_code == 404
+    c.post("/api/digest/run", headers={"X-Access-Token": "s3cret"})
+    assert c.get("/api/digest/latest").status_code == 200
+    assert c.get("/api/history").status_code == 200
+
+
+def test_guest_quota_refunded_when_model_fails(monkeypatch):
+    from meridian.llm import LLMError
+
+    monkeypatch.setenv("MERIDIAN_ACCESS_TOKEN", "s3cret")
+    monkeypatch.setenv("MERIDIAN_GUEST_QUESTIONS_PER_VISITOR", "1")
+
+    def broken():
+        raise LLMError("quota exhausted")
+
+    c = TestClient(create_app(db=digest_db(), llm_factory=broken, state=State()))
+    assert c.post("/api/ask", json=Q).status_code == 502
+    assert c.get("/api/health").json()["guest_questions_left"] == 1
+
+
+def test_guest_access_off(monkeypatch):
+    monkeypatch.setenv("MERIDIAN_ACCESS_TOKEN", "s3cret")
+    monkeypatch.setenv("MERIDIAN_GUEST_ACCESS", "off")
+    c = client()
+    assert c.get("/api/health").json()["token_required"] is True
+    assert c.post("/api/ask", json=Q).status_code == 401
+    assert c.get("/api/history").status_code == 401
 
 
 def test_rate_limit():

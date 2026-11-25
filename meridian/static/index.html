@@ -71,6 +71,11 @@ header.top .grow { flex: 1; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(31,45,77,.25); }
 .btn.primary:hover { filter: brightness(1.12); transform: translateY(-1px); }
 .btn:disabled { opacity: .55; cursor: progress; transform: none; }
+.guest-pill { font-size: 12px; color: var(--muted); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.owner { position: relative; font-size: 12px; color: var(--muted); }
+.owner summary { cursor: pointer; list-style: none; padding: 4px 6px; }
+.owner summary::-webkit-details-marker { display: none; }
+.owner input { position: absolute; right: 0; top: 30px; width: 220px; padding: 8px 10px; border: 1px solid var(--rule-strong); border-radius: 7px; background: var(--surface); z-index: 5; }
 .msg { margin-top: 14px; padding: 9px 12px; border-left: 3px solid var(--rule-strong); background: var(--paper); font-size: 13px; border-radius: 0 6px 6px 0; }
 .msg.err { border-color: var(--bad); color: var(--bad); } .msg.note { border-color: var(--warn); } .msg.ok { border-color: var(--good); }
 .spinner { width: 13px; height: 13px; border: 2px solid var(--rule-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: -2px; }
@@ -184,7 +189,8 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
   <main>
     <header class="top">
       <div class="grow"><h1 id="pageTitle">Ask</h1><p id="pageSub"></p></div>
-      <div id="tokenWrap" hidden style="width:220px"><input id="token" type="password" placeholder="Access token" autocomplete="off" aria-label="Access token" style="width:100%;padding:8px 10px;border:1px solid var(--rule-strong);border-radius:7px;background:var(--surface)"></div>
+      <span id="guestNote" class="guest-pill" hidden></span>
+      <details id="tokenWrap" class="owner" hidden><summary>Owner access</summary><input id="token" type="password" placeholder="Access token" autocomplete="off" aria-label="Access token"></details>
     </header>
     <div class="content">
 
@@ -266,7 +272,13 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
   // ------------------------------------------------------------ API
   const token = () => $("token").value.trim();
   $("token").value = ls.get("token", "");
-  $("token").addEventListener("change", () => ls.set("token", token()));
+  $("token").addEventListener("change", () => { ls.set("token", token()); refreshHealth(); });
+  let guestMode = false;
+  function setGuestLeft(n) {
+    if (!guestMode || n === null || n === undefined) { $("guestNote").hidden = true; return; }
+    $("guestNote").hidden = false;
+    $("guestNote").textContent = n > 0 ? `Guest demo · ${n} question${n === 1 ? "" : "s"} left today` : "Guest demo · no questions left today";
+  }
   async function api(path, method = "GET", body) {
     const headers = { "Content-Type": "application/json" };
     if (token()) headers["X-Access-Token"] = token();
@@ -274,7 +286,7 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const detail = typeof data.detail === "string" ? data.detail : Array.isArray(data.detail) ? data.detail.map((d) => d.msg).join("; ") : res.statusText;
-      throw new Error(res.status === 401 ? "An access token is required. Enter it at the top right." : detail || `HTTP ${res.status}`);
+      throw new Error(res.status === 401 ? `${detail || "An access token is required"}. Enter it under "Owner access" at the top right.` : detail || `HTTP ${res.status}`);
     }
     return data;
   }
@@ -354,7 +366,11 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
     $("askBtn").disabled = true;
     const pending = el("div", { class: "panel pad answer" }, el("span", { class: "spinner" }), "  Writing and checking the query for: ", el("b", {}, q));
     $("answers").prepend(pending);
-    try { pending.replaceWith(renderAnswer(await api("/api/ask", "POST", { question: q }))); }
+    try {
+      const r = await api("/api/ask", "POST", { question: q });
+      pending.replaceWith(renderAnswer(r));
+      if ("guest_questions_left" in r) setGuestLeft(r.guest_questions_left);
+    }
     catch (e) { pending.replaceWith(el("div", { class: "panel pad answer" }, el("div", { class: "msg err", style: "margin:0" }, e.message))); }
     finally { $("askBtn").disabled = false; }
   }
@@ -399,7 +415,8 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
     $("digest").replaceChildren(el("div", { class: "panel empty" }, el("span", { class: "spinner" }), " Loading the latest digest…"));
     try { renderDigest(await api("/api/digest/latest")); digestLoaded = true; }
     catch (e) {
-      if (/No digest yet/.test(e.message)) return runDigest();
+      if (/No digest yet/.test(e.message) && !guestMode) return runDigest();
+      if (/No digest yet/.test(e.message)) { $("digest").replaceChildren(el("div", { class: "panel empty" }, el("h3", {}, "No digest yet"), el("p", { class: "lede" }, "The digest runs automatically every morning. Check back after the next run."))); return; }
       $("digest").replaceChildren(el("div", { class: "panel pad" }, el("div", { class: "msg err", style: "margin:0" }, e.message)));
     }
   }
@@ -463,15 +480,20 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
   }
 
   // ------------------------------------------------------------ status
-  api("/api/health").then((h) => {
-    $("tokenWrap").hidden = !h.token_required;
+  function refreshHealth() { return api("/api/health").then((h) => {
+    const tokenSet = h.token_required || h.guest_access;
+    $("tokenWrap").hidden = !tokenSet;
+    if (h.token_required) $("tokenWrap").open = true;
+    guestMode = h.guest_access && !token();
+    $("runDigest").hidden = guestMode;
+    setGuestLeft(h.guest_questions_left);
     $("statusDb").replaceChildren(el("span", { class: "dot " + (h.database ? "ok" : "bad") }), h.database ? `Database: data through ${h.data_through}` : "Database: not connected");
     const model = h.llm_provider === "gemini" ? "Google Gemini" : "Anthropic Claude";
     $("statusModel").replaceChildren(el("span", { class: "dot " + (h.llm_ready ? "ok" : "bad") }), h.llm_ready ? `Model: ${model}` : `Model: no ${model} key`);
     if (h.data_through) $("dataScope").textContent = `Lumio Pay · operational data through ${h.data_through}`;
-  }).catch(() => $("statusDb").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable"));
+  }).catch(() => $("statusDb").replaceChildren(el("span", { class: "dot bad" }), "Server unreachable")); }
 
-  go(ls.get("page", "ask"));
+  refreshHealth().finally(() => go(ls.get("page", "ask")));
 })();
 </script>
 </body>

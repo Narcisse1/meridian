@@ -194,6 +194,13 @@ credential (`X-Access-Token`) and a Slack credential, then activate.
 **Deploy:** the `Dockerfile` serves the app on `$PORT` (Render, Railway, Fly.io). Set
 `DATABASE_URL`, an LLM key and `MERIDIAN_ACCESS_TOKEN`.
 
+**Access model (public demo):** anyone can try the live site without signing in. Guests get
+5 questions per visitor per day (50 in total), and can read the latest digest, history and data
+dictionary. The owner's token (`X-Access-Token`) removes the limit and is required to run the
+digest. Tune it with `MERIDIAN_GUEST_QUESTIONS_PER_VISITOR` and `MERIDIAN_GUEST_QUESTIONS_PER_DAY`,
+or set `MERIDIAN_GUEST_ACCESS=off` to require the token for everything. Either way, every query
+runs as a SELECT-only database role.
+
 ## Tests and evaluation
 
 ```bash

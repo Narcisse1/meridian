@@ -1,9 +1,32 @@
+<div align="center">
+
 # Meridian
 
-**An AI data analyst for PostgreSQL.** Non-technical teammates ask questions about live
-operational data in plain English and get the answer, a chart and the SQL behind it, safely,
-with the database never at risk. Every morning it also sends leadership a short brief of the key
-metrics with anomalies highlighted.
+### Your AI data analyst for PostgreSQL: plain-English questions in, safe read-only SQL and answers out.
+
+[![Live demo](https://img.shields.io/badge/Live_demo-open_the_app-1f4e8c?style=for-the-badge)](https://meridian-analyst.onrender.com)
+[![Install in your agent](https://img.shields.io/badge/Install-MCP_+_agent_skill-D97757?style=for-the-badge)](#use-it-in-your-ai-agent-mcp-server--skill)
+
+</div>
+
+![How Meridian works: question, guarded SQL, answer](docs/images/how-it-works.svg)
+
+**Meridian lets anyone on a team ask the company database a question and get a trustworthy
+answer in seconds, without SQL skills and without putting the data at risk.** It writes the
+query, proves it is read-only before running it, checks every number in the answer against the
+results, and shows the SQL so anyone can verify it. Every weekday morning it also posts a brief
+to Slack with the key metrics and anything unusual.
+
+## Why it matters
+
+| Without Meridian | With Meridian |
+|---|---|
+| Questions wait days in an analyst's queue | Answer, chart and SQL in seconds |
+| Giving everyone database access is a security risk | Four independent safety layers: the AI can only read, and only what you allow |
+| Customer emails and phone numbers leak into AI prompts | Restricted columns are invisible to the model and refused by the guard |
+| AI answers sound confident but may invent numbers | Every figure is checked against the result rows; untraceable numbers are flagged |
+| Morning metrics are assembled by hand, or not at all | n8n posts a brief at 07:00 with anomalies flagged by robust statistics |
+| Every AI tool needs its own database integration | One MCP server + skill works in Claude Code, Cursor, Copilot, Windsurf and Claude Desktop |
 
 **Live demo:** https://meridian-analyst.onrender.com (free tier: the first load after idle can
 take about a minute)
@@ -20,6 +43,32 @@ take about a minute)
 > "Which region had the highest failed transaction rate last week?"
 > → *West Africa, at 15.9%, roughly five times the other regions.* Bar chart, table, and the
 > exact read-only SQL that produced it.
+
+## Built with
+
+| Tool | Role in Meridian |
+|---|---|
+| **PostgreSQL** (hosted on **Neon**) | The data being analysed; a SELECT-only role with read-only transactions by default |
+| **sqlglot** | Parses every model-written query into a syntax tree so the guard can prove it only reads |
+| **Google Gemini** / **Anthropic Claude** | Writes the SQL plan and the summary through structured outputs; switch with `LLM_PROVIDER` |
+| **MCP** (Model Context Protocol) | Exposes the guarded tools to any AI agent; tools are annotated read-only |
+| **Agent skill** (`SKILL.md`) | Teaches agents the workflow and how to recover from rejected queries |
+| **n8n** + **Slack** | Weekday 07:00 digest: alert channel when anomalies are found, routine channel otherwise |
+| **FastAPI** + vanilla JS | Web app: Ask, Daily digest with KPI sparklines, Data dictionary, History |
+| **Docker**, **Render**, **GitHub Actions** | Deployment, plus CI that runs the tests against a real PostgreSQL service |
+
+## What this project demonstrates
+
+- **Safe AI over production data:** AST-level SQL validation, column-level privacy, read-only
+  execution and least-privilege roles, each tested independently.
+- **Self-correcting agent loop:** guard and database errors go back to the model, which repairs
+  its query (up to 3 attempts).
+- **Hallucination control:** numbers in answers and briefs are verified against the data; the
+  digest falls back to a deterministic template if the model's brief can't be verified.
+- **Statistics, not vibes:** anomalies use a weekday-adjusted median/MAD robust z-score.
+- **Agent ecosystem ready:** an MCP server and packaged skill that work on any PostgreSQL schema.
+- **Engineering quality:** 80+ tests (unit, API, MCP protocol, real PostgreSQL in CI) and an
+  NL→SQL evaluation set measuring execution accuracy.
 
 ## The problem
 

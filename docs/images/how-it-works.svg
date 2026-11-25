@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1b33"/>
+      <stop offset="1" stop-color="#1f3a63"/>
+    </linearGradient>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity=".28"/>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#9fb6d8"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="560" rx="18" fill="url(#bg)"/>
+
+  <text x="60" y="78" fill="#ffffff" font-size="34" font-family="Georgia, 'Times New Roman', serif" font-weight="700">Ask your database in plain English. Safely.</text>
+  <text x="60" y="114" fill="#b9c8e2" font-size="18">Meridian turns a question into validated, read-only SQL, runs it, and answers with the numbers, a chart and the query.</text>
+
+  <!-- card 1: question -->
+  <g filter="url(#sh)">
+    <rect x="60" y="160" width="320" height="300" rx="14" fill="#ffffff"/>
+  </g>
+  <text x="84" y="196" fill="#5b6577" font-size="13" font-weight="700" letter-spacing="1.5">1 · QUESTION</text>
+  <rect x="84" y="214" width="272" height="96" rx="10" fill="#eef3fb"/>
+  <text x="100" y="246" fill="#16233b" font-size="17">Which region had the highest</text>
+  <text x="100" y="270" fill="#16233b" font-size="17">failed transaction rate last</text>
+  <text x="100" y="294" fill="#16233b" font-size="17">week?</text>
+  <text x="84" y="348" fill="#5b6577" font-size="14">From a teammate in the web app,</text>
+  <text x="84" y="370" fill="#5b6577" font-size="14">or from any AI agent through the</text>
+  <text x="84" y="392" fill="#5b6577" font-size="14">MCP server: Claude Code, Cursor,</text>
+  <text x="84" y="414" fill="#5b6577" font-size="14">Copilot, Windsurf…</text>
+
+  <path d="M388 310 H 432" stroke="#9fb6d8" stroke-width="3" marker-end="url(#arr)"/>
+
+  <!-- card 2: guarded SQL -->
+  <g filter="url(#sh)">
+    <rect x="440" y="160" width="320" height="300" rx="14" fill="#ffffff"/>
+  </g>
+  <text x="464" y="196" fill="#5b6577" font-size="13" font-weight="700" letter-spacing="1.5">2 · GUARDED SQL</text>
+  <rect x="464" y="214" width="272" height="118" rx="10" fill="#16233b"/>
+  <g font-family="Consolas, Menlo, monospace" font-size="13">
+    <text x="478" y="240" fill="#7fb2ff">SELECT</text><text x="536" y="240" fill="#e6edf7">r.name,</text>
+    <text x="478" y="260" fill="#e6edf7">  round(100.0*avg(</text>
+    <text x="478" y="280" fill="#e6edf7">  (t.status='failed')::int),2)</text>
+    <text x="478" y="300" fill="#7fb2ff">FROM</text><text x="518" y="300" fill="#e6edf7">transactions t JOIN …</text>
+    <text x="478" y="320" fill="#7fb2ff">GROUP BY</text><text x="552" y="320" fill="#e6edf7">1 </text><text x="570" y="320" fill="#7fb2ff">ORDER BY</text><text x="644" y="320" fill="#e6edf7">2 DESC</text>
+  </g>
+  <g font-size="14" fill="#16233b">
+    <circle cx="474" cy="358" r="7" fill="#2f8f5b"/><text x="488" y="363">SELECT only, one statement</text>
+    <circle cx="474" cy="384" r="7" fill="#2f8f5b"/><text x="488" y="389">Allowed tables, no sensitive columns</text>
+    <circle cx="474" cy="410" r="7" fill="#2f8f5b"/><text x="488" y="415">Read-only transaction + timeout</text>
+    <circle cx="474" cy="436" r="7" fill="#2f8f5b"/><text x="488" y="441">SELECT-only database role</text>
+  </g>
+
+  <path d="M768 310 H 812" stroke="#9fb6d8" stroke-width="3" marker-end="url(#arr)"/>
+
+  <!-- card 3: answer -->
+  <g filter="url(#sh)">
+    <rect x="820" y="160" width="320" height="300" rx="14" fill="#ffffff"/>
+  </g>
+  <text x="844" y="196" fill="#5b6577" font-size="13" font-weight="700" letter-spacing="1.5">3 · ANSWER</text>
+  <text x="844" y="230" fill="#16233b" font-size="16" font-weight="600">West Africa: 15.9% of payments</text>
+  <text x="844" y="252" fill="#16233b" font-size="16" font-weight="600">failed, about 5x other regions.</text>
+  <g font-size="12" fill="#5b6577">
+    <text x="844" y="292">West Africa</text><rect x="930" y="280" width="180" height="16" rx="3" fill="#c2410c"/>
+    <text x="844" y="318">East Africa</text><rect x="930" y="306" width="39" height="16" rx="3" fill="#1f4e8c"/>
+    <text x="844" y="344">Europe</text><rect x="930" y="332" width="35" height="16" rx="3" fill="#1f4e8c"/>  </g>
+  <rect x="844" y="392" width="272" height="44" rx="8" fill="#eef7f1"/>
+  <text x="858" y="413" fill="#1f6b43" font-size="13">Every number checked against the</text>
+  <text x="858" y="430" fill="#1f6b43" font-size="13">result rows · SQL shown with the answer</text>
+
+  <!-- footer band -->
+  <text x="60" y="510" fill="#b9c8e2" font-size="15">Plus a daily executive brief: metrics vs. their normal range, anomalies flagged (robust z-score), posted to Slack by n8n.</text>
+  <text x="60" y="534" fill="#7f93b5" font-size="13">Illustration of the demo dataset (fictional company Lumio Pay). PostgreSQL · sqlglot · FastAPI · Gemini / Claude · MCP · n8n</text>
+</svg>

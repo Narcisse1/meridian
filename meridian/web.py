@@ -25,7 +25,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from .analyst import SEMANTIC_LAYER, Analyst
+from .analyst import Analyst, semantic_layer
 from .db import Database, PostgresDatabase, QueryError
 from .digest import build_digest
 from .llm import LLMError, StructuredLLM, make_llm, provider_ready, resolve_provider
@@ -177,7 +177,7 @@ def create_app(
                  "columns": [{"name": c.name, "type": c.type, "comment": c.comment} for c in t.columns]}
                 for t in tables
             ],
-            "definitions": [line[2:] for line in SEMANTIC_LAYER.splitlines() if line.startswith("- ")],
+            "definitions": [line[2:] for line in semantic_layer(tables).splitlines() if line.startswith("- ")],
         }  # fmt: skip
 
     return app

@@ -60,3 +60,43 @@ def test_digest_finds_planted_anomalies(db):
     assert "failed_rate" in flagged and "signups" in flagged
     assert digest.regions[0].region == "West Africa"
     assert digest.top_failure_reasons[0]["reason"] == "issuer_unavailable"
+
+
+def test_hidden_columns_and_allow_list_on_a_real_database():
+    from meridian.db import guard_scope
+    from meridian.sqlguard import UnsafeQueryError
+
+    db = PostgresDatabase(
+        URL, tables=("customers", "regions"), hidden_columns={"customers": {"channel"}}
+    )
+    tables = {t.name: t for t in db.schema()}
+    assert list(tables) == ["customers", "regions"]
+    assert "channel" not in {c.name for c in tables["customers"].columns}
+    scope = guard_scope(db)
+    with pytest.raises(UnsafeQueryError, match="restricted"):
+        check_sql("SELECT channel, count(*) FROM customers GROUP BY 1", **scope)
+    with pytest.raises(UnsafeQueryError, match="not available"):
+        check_sql("SELECT count(*) FROM transactions", **scope)
+    ok = check_sql("SELECT plan, count(*) AS n FROM customers GROUP BY 1", **scope)
+    assert len(db.query(ok.sql).rows) >= 2
+
+
+def test_mcp_tools_on_a_real_database():
+    import asyncio
+    import json
+
+    from meridian.mcp_server import build_server
+
+    server = build_server(PostgresDatabase(URL, hidden_columns={"customers": {"channel"}}))
+
+    def call(tool, **args):
+        out = asyncio.run(server.call_tool(tool, args))
+        out = getattr(out, "content", out)
+        blocks = out[0] if isinstance(out, tuple) else out
+        return "".join(getattr(b, "text", "") for b in blocks)
+
+    assert "transactions (~" in call("list_tables")
+    sample = json.loads(call("sample_rows", table="customers", limit=3))
+    assert sample["row_count"] == 3 and "channel" not in sample["columns"]
+    rows = json.loads(call("run_query", sql="SELECT count(*) AS n FROM regions"))["rows"]
+    assert rows == [{"n": 6}]

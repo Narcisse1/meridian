@@ -1,16 +1,51 @@
-"""Read-only PostgreSQL access: query execution and schema introspection."""
+"""Read-only PostgreSQL access: query execution and schema introspection.
+
+Works with any PostgreSQL database. Configuration (environment variables):
+
+    DATABASE_URL              connection string (use a read-only role, see db/readonly_role.sql)
+    MERIDIAN_SCHEMA           schema to expose (default: public)
+    MERIDIAN_TABLES           comma-separated allow-list (default: every table/view in the schema)
+    MERIDIAN_HIDDEN_COLUMNS   sensitive columns never shown or queried,
+                              e.g. "customers.email,customers.phone,users.password_hash"
+"""
 
 from __future__ import annotations
 
 import datetime as dt
 import decimal
 import os
+import re
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+# The bundled demo database (db/schema.sql). Used for the demo's metric definitions and digest.
 TABLES = ("regions", "customers", "subscriptions", "transactions")
+DEMO_TABLES = TABLES
 STATEMENT_TIMEOUT_MS = 8000
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+
+
+def _identifier(name: str, what: str) -> str:
+    name = name.strip()
+    if not _IDENT.match(name):
+        raise QueryError(f"invalid {what} name {name!r}")
+    return name
+
+
+def parse_hidden_columns(spec: str | None) -> dict[str, set[str]]:
+    """'customers.email, users.phone' -> {'customers': {'email'}, 'users': {'phone'}}."""
+    hidden: dict[str, set[str]] = {}
+    for item in (spec or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "." not in item:
+            raise QueryError(f"MERIDIAN_HIDDEN_COLUMNS entry {item!r} must be table.column")
+        table, column = (part.strip().lower() for part in item.rsplit(".", 1))
+        hidden.setdefault(_identifier(table, "table"), set()).add(_identifier(column, "column"))
+    return hidden
 
 
 class QueryError(RuntimeError):
@@ -62,11 +97,29 @@ class PostgresDatabase:
     Connect as a role that only has SELECT grants (db/readonly_role.sql) for a third layer.
     """
 
-    def __init__(self, url: str | None = None, *, tables: tuple[str, ...] = TABLES) -> None:
+    def __init__(
+        self,
+        url: str | None = None,
+        *,
+        tables: tuple[str, ...] | None = None,
+        schema_name: str | None = None,
+        hidden_columns: Mapping[str, set[str]] | None = None,
+    ) -> None:
         self.url = url or os.environ.get("DATABASE_URL", "")
         if not self.url:
             raise QueryError("DATABASE_URL is not set")
-        self.tables = tables
+        if tables is None and os.environ.get("MERIDIAN_TABLES", "").strip():
+            tables = tuple(t for t in os.environ["MERIDIAN_TABLES"].split(",") if t.strip())
+        # None = discover every table and view in the schema
+        self.tables = tuple(_identifier(t, "table").lower() for t in tables) if tables else None
+        self.schema_name = _identifier(
+            schema_name or os.environ.get("MERIDIAN_SCHEMA") or "public", "schema"
+        )
+        self.hidden_columns = (
+            dict(hidden_columns)
+            if hidden_columns is not None
+            else parse_hidden_columns(os.environ.get("MERIDIAN_HIDDEN_COLUMNS"))
+        )
         self._schema_cache: tuple[float, list[Table]] | None = None
 
     def _connect(self):
@@ -105,7 +158,11 @@ class PostgresDatabase:
     def schema(self) -> list[Table]:
         if self._schema_cache and time.time() - self._schema_cache[0] < 600:
             return self._schema_cache[1]
-        names = ", ".join(f"'{t}'" for t in self.tables)
+        only = (
+            "AND c.relname IN (" + ", ".join(f"'{t}'" for t in self.tables) + ")"
+            if self.tables
+            else ""
+        )
         cols = self.query(
             f"""
             SELECT c.relname, a.attname, format_type(a.atttypid, a.atttypmod),
@@ -113,22 +170,38 @@ class PostgresDatabase:
                    coalesce(obj_description(c.oid, 'pg_class'), ''),
                    greatest(c.reltuples, 0)::bigint
             FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+            JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = '{self.schema_name}'
             JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
-            WHERE c.relname IN ({names})
+            WHERE c.relkind IN ('r', 'v', 'm', 'p') {only}
             ORDER BY c.relname, a.attnum
             """,
-            max_rows=2000,
+            max_rows=20000,
         )
         tables: dict[str, Table] = {}
         for rel, col, typ, col_comment, tbl_comment, estimate in cols.rows:
             table = tables.setdefault(
                 rel, Table(name=rel, comment=tbl_comment, row_estimate=int(estimate))
             )
+            if col.lower() in self.hidden_columns.get(rel.lower(), set()):
+                continue  # sensitive: never shown to the model
             table.columns.append(Column(name=col, type=typ, comment=col_comment))
-        ordered = [tables[t] for t in self.tables if t in tables]
+        order = self.tables or tuple(sorted(tables))
+        ordered = [tables[t] for t in order if t in tables]
         self._schema_cache = (time.time(), ordered)
         return ordered
+
+
+def guard_scope(db: Database) -> dict[str, Any]:
+    """Arguments for sqlguard.check_sql that match what this database exposes."""
+    return {
+        "allowed_tables": [t.name for t in db.schema()],
+        "schema": getattr(db, "schema_name", "public"),
+        "hidden_columns": getattr(db, "hidden_columns", {}),
+    }
+
+
+def is_demo(tables: list[Table]) -> bool:
+    return set(DEMO_TABLES) <= {t.name for t in tables}
 
 
 def describe_schema(tables: list[Table]) -> str:

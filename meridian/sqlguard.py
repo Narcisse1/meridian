@@ -7,14 +7,15 @@ is not enough to change data.
 Rules enforced here:
   * exactly one statement, and it is a query (SELECT / WITH ... SELECT / UNION of selects)
   * no data-changing or schema-changing constructs anywhere in the tree (including CTEs)
-  * only allow-listed tables (CTE names are fine)
+  * only allow-listed tables in the configured schema (CTE names are fine)
+  * restricted (sensitive) columns are never read, and SELECT * is refused on their tables
   * no dangerous functions (sleep, file access, settings, remote connections, ...)
   * a row limit is always applied to the outer query
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 import sqlglot
@@ -66,8 +67,20 @@ def _function_name(node: exp.Expression) -> str:
 
 
 def check_sql(
-    sql: str, allowed_tables: Iterable[str], *, row_limit: int = DEFAULT_ROW_LIMIT
+    sql: str,
+    allowed_tables: Iterable[str],
+    *,
+    row_limit: int = DEFAULT_ROW_LIMIT,
+    schema: str = "public",
+    hidden_columns: Mapping[str, Iterable[str]] | None = None,
 ) -> CheckedQuery:
+    """Validate one model-written query.
+
+    `hidden_columns` maps table -> sensitive column names (e.g. {"customers": {"email"}}).
+    Any reference to such a column name, in a query that touches that table, is refused,
+    as is `SELECT *` / `t.*` on it, because the star would expand to include the column.
+    The check is by column name, so it errs on the side of refusing.
+    """
     text = (sql or "").strip().rstrip(";").strip()
     if not text:
         raise UnsafeQueryError("empty query")
@@ -99,9 +112,9 @@ def check_sql(
         name = table.name.lower()
         if not name:  # e.g. table functions such as generate_series(...)
             continue
-        schema = (table.db or "").lower()
-        if schema and schema != "public":
-            raise UnsafeQueryError(f"schema {schema!r} is not allowed")
+        table_schema = (table.db or "").lower()
+        if table_schema and table_schema != schema.lower():
+            raise UnsafeQueryError(f"schema {table_schema!r} is not allowed")
         if name in cte_names:
             continue
         if name not in allowed:
@@ -109,6 +122,21 @@ def check_sql(
                 f"table {name!r} is not available; use one of: {', '.join(sorted(allowed))}"
             )
         used.add(name)
+
+    hidden = {t.lower(): {c.lower() for c in cols} for t, cols in (hidden_columns or {}).items()}
+    restricted = set().union(*(hidden.get(t, set()) for t in used)) if used else set()
+    if restricted:
+        for column in tree.find_all(exp.Column):
+            if column.name.lower() in restricted:
+                raise UnsafeQueryError(
+                    f"column {column.name!r} is restricted (sensitive data) and cannot be queried"
+                )
+        for star in tree.find_all(exp.Star):
+            if not isinstance(star.parent, exp.Count):  # COUNT(*) reads no column values
+                raise UnsafeQueryError(
+                    "SELECT * is not allowed on tables with restricted columns; "
+                    "list the columns you need"
+                )
 
     inner = tree.sql(dialect=DIALECT)
     limited = f"SELECT * FROM ({inner}) AS meridian_q LIMIT {int(row_limit)}"

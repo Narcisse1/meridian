@@ -8,6 +8,15 @@ metrics with anomalies highlighted.
 **Live demo:** https://meridian-analyst.onrender.com (free tier: the first load after idle can
 take about a minute)
 
+[![CI](https://github.com/Narcisse1/meridian/actions/workflows/ci.yml/badge.svg)](https://github.com/Narcisse1/meridian/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-read--only-4169E1?logo=postgresql&logoColor=white)
+![MCP](https://img.shields.io/badge/MCP-server-000000)
+![Agent skill](https://img.shields.io/badge/Agent_skill-Claude_Code_%7C_Cursor_%7C_Copilot-D97757)
+![n8n](https://img.shields.io/badge/n8n-daily_digest-EA4B71?logo=n8n&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?logo=googlegemini&logoColor=white)
+![Claude](https://img.shields.io/badge/Anthropic_Claude-191919?logo=anthropic&logoColor=white)
+
 > "Which region had the highest failed transaction rate last week?"
 > → *West Africa, at 15.9%, roughly five times the other regions.* Bar chart, table, and the
 > exact read-only SQL that produced it.
@@ -25,7 +34,8 @@ And the numbers leaders need every morning are assembled by hand, or not at all.
 | **Ask** | Natural language → validated, read-only SQL → answer, chart, table, CSV |
 | **Daily digest** | Revenue, transactions, failed-payment rate, sign-ups and churn vs their normal range; anomalies flagged; a short brief written from the computed facts |
 | **Automation** | An n8n workflow (included) runs the digest every weekday at 07:00 and posts to Slack: an alert channel if anything is anomalous, a routine channel otherwise |
-| **MCP server** | Claude Desktop / Claude Code can use the same safe tools (`ask`, `run_query`, `list_tables`, `describe_table`, `daily_digest`) |
+| **MCP server + agent skill** | Any AI coding agent (Claude Code, Cursor, Copilot, Windsurf, Claude Desktop) gets the same guarded tools on **any PostgreSQL database**: `list_tables`, `describe_table`, `sample_rows`, `run_query`, `ask`, `daily_digest`. A packaged skill teaches the agent when and how to use them |
+| **Sensitive data stays hidden** | Mark columns such as emails or phone numbers as restricted: they disappear from the schema the model sees, and any query touching them is refused |
 
 ```mermaid
 flowchart LR
@@ -42,20 +52,53 @@ flowchart LR
   Z --> B[LLM brief<br/>from facts only] --> SL[Slack]
 ```
 
-## Safety: three independent layers
+## Use it in your AI agent (MCP server + skill)
+
+Meridian works with **any PostgreSQL database**, not only the demo. Your agent writes the SQL;
+Meridian makes sure it can only read, and only what you allow. No LLM key is needed for this.
+
+```bash
+claude mcp add meridian \
+  -e DATABASE_URL="postgresql://meridian_reader:PASSWORD@HOST/db?sslmode=require" \
+  -e MERIDIAN_HIDDEN_COLUMNS="customers.email,customers.phone" \
+  -- uvx --from git+https://github.com/Narcisse1/meridian meridian mcp
+```
+
+Then add the skill: copy [`skill/meridian-postgres-analyst/`](skill/meridian-postgres-analyst)
+to `~/.claude/skills/`. It tells the agent the workflow (map the schema → check real values →
+one aggregated query → cite the SQL), how to recover from each kind of rejected query, and
+proven query patterns (period comparisons, cohorts, funnels, anomaly checks). Setup for Cursor,
+VS Code/Copilot, Windsurf and Claude Desktop is in
+[`references/setup.md`](skill/meridian-postgres-analyst/references/setup.md).
+
+| Setting | Meaning |
+|---|---|
+| `MERIDIAN_SCHEMA` | Schema to expose (default `public`) |
+| `MERIDIAN_TABLES` | Allow-list of tables (default: every table and view in the schema) |
+| `MERIDIAN_HIDDEN_COLUMNS` | Sensitive columns, never shown or queried (`table.column,...`) |
+| `MERIDIAN_DEFINITIONS` | Your business definitions in Markdown ([example](docs/definitions.example.md)) |
+| `MERIDIAN_DATE_COLUMN` | `table.column` that anchors "last week" on the latest data |
+
+All tools are annotated read-only, so clients can approve them safely.
+
+## Safety: four independent layers
 
 1. **SQL guard** (`meridian/sqlguard.py`, sqlglot AST): one statement only; must be a query;
    no INSERT/UPDATE/DELETE/DDL anywhere in the tree (including data-modifying CTEs); no
    `SELECT INTO` or row locks; no dangerous functions (`pg_sleep`, `pg_read_file`, `dblink`,
-   `set_config`, ...); only allow-listed tables (no system catalogs); a row limit is always
-   applied. 38 tests cover these cases.
-2. **Read-only execution**: every query runs in `SET TRANSACTION READ ONLY` with a statement
+   `set_config`, ...); only allow-listed tables in the configured schema (no system catalogs);
+   a row limit is always applied. 38 tests cover these cases.
+2. **Column-level privacy**: restricted columns are removed from the schema the model sees, and
+   any query that names them, or uses `SELECT *` on their tables, is refused. `COUNT(*)` still
+   works.
+3. **Read-only execution**: every query runs in `SET TRANSACTION READ ONLY` with a statement
    timeout.
-3. **Least-privilege role**: the app connects as `meridian_reader`, which only has SELECT grants
+4. **Least-privilege role**: the app connects as `meridian_reader`, which only has SELECT grants
    and `default_transaction_read_only = on`. An integration test proves writes fail even when
    the guard is bypassed.
 
-Errors from layers 1–2 are fed back to the model, which repairs its query (up to 3 attempts).
+Errors from the guard and the database are fed back to the model, which repairs its query (up to
+3 attempts).
 
 ## Reliability and honesty
 
@@ -94,8 +137,7 @@ meridian digest               # prints today's brief as Markdown
 meridian mcp                  # MCP server over stdio
 ```
 
-**Claude Desktop / Claude Code:** add an MCP server with command `meridian` and argument `mcp`,
-with `DATABASE_URL` and a model key in its environment.
+**MCP clients:** see [Use it in your AI agent](#use-it-in-your-ai-agent-mcp-server--skill).
 
 **n8n:** import `n8n/daily-digest.json`, set the URL to your deployment, create a Header Auth
 credential (`X-Access-Token`) and a Slack credential, then activate.
@@ -124,8 +166,10 @@ meridian/
   digest.py       metrics, anomaly detection, grounded brief with template fallback
   llm.py          Claude / Gemini provider layer
   web.py          FastAPI app; static/index.html is the UI
-  mcp_server.py   MCP tools
+  mcp_server.py   MCP tools (read-only annotated; MCP SDK 1.x and 2.x)
   state.py        question and digest history (SQLite)
+skill/            installable agent skill: SKILL.md + setup and query-pattern references
+docs/             example business-definitions file
 db/               schema, seed, read-only role
 n8n/              scheduled digest workflow
 evals/            NL→SQL eval set and runner

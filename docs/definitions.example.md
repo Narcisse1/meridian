@@ -1,0 +1,5 @@
+- Revenue = SUM(orders.total) WHERE orders.status = 'paid'. Amounts are in USD.
+- Order count = COUNT(*) of orders with status IN ('paid', 'refunded').
+- Active customer (in a period) = a customer with at least one paid order in that period.
+- Refund rate = refunded orders / paid + refunded orders, for the same period and slice.
+- A customer's country is customers.country (ISO 3166-1 alpha-2 code).

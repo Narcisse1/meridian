@@ -1,6 +1,6 @@
 [project]
 name = "meridian"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI data analyst: natural-language questions to safe, read-only SQL over PostgreSQL, plus scheduled executive digests with anomaly detection."
 readme = "README.md"
 requires-python = ">=3.10"

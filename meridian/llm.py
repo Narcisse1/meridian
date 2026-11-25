@@ -343,7 +343,8 @@ class GeminiLLM:
         if not pinned or _unavailable.get(self.model, 0) > time.time():
             self._set_model(self._next_model())
         overloaded = 0
-        for attempt in range(self.attempts):
+        attempt = 0  # counts retries of the same model; switching models is free
+        while True:
             try:
                 return self.client.models.generate_content(
                     model=self.model, contents=prompt, config=config
@@ -354,13 +355,13 @@ class GeminiLLM:
                 if code == 404:
                     # Renamed or retired model: never use it again in this process.
                     self._mark_unavailable(self.model, 365 * 86400, "not found")
-                    self._set_model(self._next_model())
+                    self._set_model(self._next_model())  # raises when none are left
                     continue
                 if code == 429 and _is_daily_quota(message):
                     # Daily quotas are per model: move on instead of waiting hours.
                     wait = _retry_after_seconds(message, 6 * 3600)
                     self._mark_unavailable(self.model, wait, "daily quota used up")
-                    self._set_model(self._next_model())
+                    self._set_model(self._next_model())  # raises when none are left
                     continue
                 if code == 503:
                     overloaded += 1
@@ -379,7 +380,7 @@ class GeminiLLM:
                 delay = _retry_after_seconds(message, min(5 * 2**attempt, 60))
                 log.info("gemini %s, retrying in %.0fs", code, delay)
                 http._sleep(min(delay, 60))
-        raise LLMError("gemini request failed")  # pragma: no cover
+                attempt += 1
 
     def structured(self, *, system: str, prompt: str, schema: type[T]) -> T:
         response = self._generate(system, prompt, schema)

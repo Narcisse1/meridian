@@ -85,13 +85,18 @@ class Digest:
         data = asdict(self)
         data["anomalies"] = [m.key for m in self.anomalies]
         data["markdown"] = self.markdown()
+        data["slack"] = self.markdown(table=False)
         return data
 
-    def markdown(self) -> str:
+    def markdown(self, *, table: bool = True) -> str:
+        """The brief as Markdown. Slack's mrkdwn has no tables, so `table=False` drops the
+        metric table (the bullets already carry every metric with its change)."""
         lines = [f"*Daily brief for {self.as_of}*", "", f"*{self.headline}*", ""]
         lines += [f"• {b}" for b in self.bullets]
         if self.watch:
             lines += ["", "*Watch:*"] + [f"• {w}" for w in self.watch]
+        if not table:
+            return "\n".join(lines)
         lines += ["", "| Metric | Value | vs 28-day typical |", "|---|---|---|"]
         for m in self.metrics:
             change = "n/a" if m.change_pct is None else f"{m.change_pct:+.1f}%"

@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "Meridian - daily executive digest",
   "nodes": [
     {
@@ -53,7 +53,7 @@
       "parameters": {
         "select": "channel",
         "channelId": { "__rl": true, "value": "#leadership", "mode": "name" },
-        "text": "=:rotating_light: {{ $json.anomalies.length }} metric(s) need attention\n\n{{ $json.markdown }}",
+        "text": "=:rotating_light: {{ $json.anomalies.length }} metric(s) need attention\n\n{{ $json.slack }}",
         "otherOptions": {}
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000004",
@@ -67,7 +67,7 @@
       "parameters": {
         "select": "channel",
         "channelId": { "__rl": true, "value": "#metrics", "mode": "name" },
-        "text": "={{ $json.markdown }}",
+        "text": "={{ $json.slack }}",
         "otherOptions": {}
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000005",

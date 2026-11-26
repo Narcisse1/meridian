@@ -128,6 +128,8 @@ def test_build_digest_detects_planted_anomalies_with_model_brief():
         and "Failed transaction rate | 6.08%" in md
         and "⚠" in md
     )
+    slack = d.to_dict()["slack"]
+    assert slack.startswith("*Daily brief for 2026-11-23*") and "|" not in slack
 
 
 def test_invented_numbers_fall_back_to_template():

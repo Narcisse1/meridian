@@ -98,6 +98,26 @@ produced it.
 
 ![Meridian data dictionary with business definitions](docs/images/data-dictionary.png)
 
+### The daily digest, automated end to end
+
+Every weekday at 07:00 (Africa/Douala) an **n8n** workflow wakes the app (free hosting sleeps
+when idle), runs the digest, and branches: if any metric is outside its normal range it posts
+an alert to Slack, otherwise a routine summary. The workflow is in
+[`n8n/daily-digest.json`](n8n/daily-digest.json).
+
+![n8n workflow: schedule, wake up, run digest, branch on anomalies, post to Slack](docs/images/n8n-workflow.png)
+
+**What lands in Slack.** Every figure is computed with fixed SQL and compared with the same
+weekday over the previous 28 days. The AI may only word the brief from those computed facts;
+any number it writes that is not among them is rejected, and a template brief is used instead.
+
+![Slack alert: 3 metrics need attention, with the morning brief](docs/images/slack-alert.png)
+
+**The same digest in the app,** with sparklines, the regional breakdown and the top failure
+reasons, so the person reading the alert can see what changed and ask follow-up questions.
+
+![Meridian daily digest page with metric cards, anomalies and regional breakdown](docs/images/daily-digest.png)
+
 ```mermaid
 flowchart LR
   Q[Question] --> P[LLM: query plan<br/>structured output]

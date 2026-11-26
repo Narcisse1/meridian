@@ -1,15 +1,40 @@
-﻿{
-  "name": "Meridian - daily executive digest",
+{
+  "name": "Meridian: daily executive digest",
   "nodes": [
     {
       "parameters": {
         "rule": { "interval": [ { "field": "cronExpression", "expression": "0 7 * * 1-5" } ] }
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000001",
-      "name": "Weekdays at 07:00",
+      "name": "Weekdays 07:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [0, 96]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR-MERIDIAN-HOST/api/health",
+        "options": { "timeout": 120000 }
+      },
+      "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000006",
+      "name": "Wake Meridian up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [224, 96],
+      "notes": "Free hosting plans sleep when idle; this request starts the app before the digest runs.",
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": { "amount": 60, "unit": "seconds" },
+      "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000007",
+      "name": "Give it a minute",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [448, 96]
     },
     {
       "parameters": {
@@ -17,17 +42,17 @@
         "url": "https://YOUR-MERIDIAN-HOST/api/digest/run",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "options": { "timeout": 120000 }
+        "options": { "timeout": 180000 }
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000002",
       "name": "Run Meridian digest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [260, 0],
+      "position": [672, 96],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 30000,
-      "credentials": { "httpHeaderAuth": { "id": "", "name": "Meridian access token (X-Access-Token)" } }
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": { "httpHeaderAuth": { "id": "", "name": "Meridian owner token (header X-Access-Token)" } }
     },
     {
       "parameters": {
@@ -47,39 +72,43 @@
       "name": "Any anomalies?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [520, 0]
+      "position": [896, 96]
     },
     {
       "parameters": {
+        "authentication": "oAuth2",
         "select": "channel",
         "channelId": { "__rl": true, "value": "#leadership", "mode": "name" },
-        "text": "=:rotating_light: {{ $json.anomalies.length }} metric(s) need attention\n\n{{ $json.slack }}",
-        "otherOptions": {}
+        "text": "=:rotating_light: {{ $json.anomalies.length }} metric(s) need attention\n\n{{ $json.slack }}\n\n<https://YOUR-MERIDIAN-HOST|Open Meridian> to ask follow-up questions.",
+        "otherOptions": { "includeLinkToWorkflow": false, "unfurl_links": false, "unfurl_media": false }
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000004",
       "name": "Alert leadership channel",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [780, -100],
-      "credentials": { "slackApi": { "id": "", "name": "Slack account" } }
+      "position": [1120, 0],
+      "credentials": { "slackOAuth2Api": { "id": "", "name": "Slack account" } }
     },
     {
       "parameters": {
+        "authentication": "oAuth2",
         "select": "channel",
         "channelId": { "__rl": true, "value": "#metrics", "mode": "name" },
-        "text": "={{ $json.slack }}",
-        "otherOptions": {}
+        "text": "={{ $json.slack }}\n\n<https://YOUR-MERIDIAN-HOST|Open Meridian> to ask follow-up questions.",
+        "otherOptions": { "includeLinkToWorkflow": false, "unfurl_links": false, "unfurl_media": false }
       },
       "id": "a1f3b6d0-1c1e-4a7e-9a10-000000000005",
       "name": "Post routine digest",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [780, 100],
-      "credentials": { "slackApi": { "id": "", "name": "Slack account" } }
+      "position": [1120, 192],
+      "credentials": { "slackOAuth2Api": { "id": "", "name": "Slack account" } }
     }
   ],
   "connections": {
-    "Weekdays at 07:00": { "main": [ [ { "node": "Run Meridian digest", "type": "main", "index": 0 } ] ] },
+    "Weekdays 07:00": { "main": [ [ { "node": "Wake Meridian up", "type": "main", "index": 0 } ] ] },
+    "Wake Meridian up": { "main": [ [ { "node": "Give it a minute", "type": "main", "index": 0 } ] ] },
+    "Give it a minute": { "main": [ [ { "node": "Run Meridian digest", "type": "main", "index": 0 } ] ] },
     "Run Meridian digest": { "main": [ [ { "node": "Any anomalies?", "type": "main", "index": 0 } ] ] },
     "Any anomalies?": {
       "main": [

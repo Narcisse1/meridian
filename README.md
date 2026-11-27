@@ -6,6 +6,7 @@
 
 [![Live demo](https://img.shields.io/badge/Live_demo-open_the_app-1f4e8c?style=for-the-badge)](https://meridian-analyst.onrender.com)
 [![Install in your agent](https://img.shields.io/badge/Install-MCP_+_agent_skill-D97757?style=for-the-badge)](#use-it-in-your-ai-agent-mcp-server--skill)
+[![Get it on Agensi](https://img.shields.io/badge/Agensi-free_agent_skill-14213d?style=for-the-badge)](https://www.agensi.io/skills/meridian-ask-postgres-anything-in-plain-english)
 
 </div>
 
@@ -145,7 +146,9 @@ claude mcp add meridian \
   -- uvx --from git+https://github.com/Narcisse1/meridian meridian mcp
 ```
 
-Then add the skill: copy [`skill/meridian-postgres-analyst/`](skill/meridian-postgres-analyst)
+Then add the skill: get it free on
+[Agensi](https://www.agensi.io/skills/meridian-ask-postgres-anything-in-plain-english), where it
+passed their security review, or copy [`skill/meridian-postgres-analyst/`](skill/meridian-postgres-analyst)
 to `~/.claude/skills/`. It tells the agent the workflow (map the schema → check real values →
 one aggregated query → cite the SQL), how to recover from each kind of rejected query, and
 proven query patterns (period comparisons, cohorts, funnels, anomaly checks). Setup for Cursor,

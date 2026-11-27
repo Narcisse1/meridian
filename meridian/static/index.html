@@ -156,16 +156,65 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
 
 @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 960px) {
-  .layout { grid-template-columns: 1fr; }
-  nav.side { position: static; height: auto; padding: 14px 0 0; }
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  nav.side { position: static; height: auto; padding: 14px 0 0; min-width: 0; }
   .wordmark { padding-bottom: 12px; } .nav-label, .side-foot { display: none; }
   .navlist { flex-direction: row; overflow-x: auto; } .navlist button { width: auto; white-space: nowrap; }
   header.top, .content { padding-left: 18px; padding-right: 18px; }
   .banner-inner { padding: 26px 20px; } .banner h2 { font-size: 22px; }
-  .answer-body, .digest-head, .twocol, .dict { grid-template-columns: 1fr; }
+  .answer-body, .digest-head, .twocol, .dict { grid-template-columns: minmax(0, 1fr); }
   .answer-body > div + div, .digest-head > div + div { border-left: 0; border-top: 1px solid var(--rule); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  header.top { flex-wrap: wrap; align-items: center; }
+  .sql-actions, .section-h { flex-wrap: wrap; gap: 8px; }
 }
+/* Phones: compact sticky top bar, readable type, no sideways scrolling */
+@media (max-width: 600px) {
+  nav.side { position: sticky; top: 0; z-index: 20; flex-direction: row; align-items: center; padding: 8px 0 8px 12px; border-right: 0; border-bottom: 1px solid var(--rule); }
+  .wordmark { padding: 0 6px 0 0; border-bottom: 0; gap: 8px; }
+  .wordmark small { display: none; }
+  .mark { width: 30px; height: 30px; font-size: 17px; }
+  .navlist { flex: 1; min-width: 0; padding: 0 12px 0 4px; scrollbar-width: none; }
+  .navlist::-webkit-scrollbar { display: none; }
+  .navlist button { padding: 8px 10px; gap: 6px; }
+  header.top { padding: 16px 16px 14px; gap: 8px 10px; }
+  header.top .grow { flex-basis: 100%; }
+  header.top h1 { font-size: 23px; }
+  header.top p { font-size: 13px; }
+  .guest-pill { white-space: normal; }
+  .owner input { right: auto; left: 0; width: min(240px, calc(100vw - 32px)); }
+  .content { padding: 16px 16px 64px; }
+  .banner { border-radius: 12px; margin-bottom: 16px; }
+  .banner::after { background: linear-gradient(180deg, rgba(14,20,34,.9) 0%, rgba(14,20,34,.86) 100%); }
+  .banner-inner { padding: 22px 16px 18px; }
+  .banner h2 { font-size: 21px; }
+  .banner p { font-size: 14px; margin-bottom: 16px; }
+  .askbox { flex-direction: column; gap: 6px; }
+  .askbox input { font-size: 16px; padding: 10px; }
+  .askbox .btn.primary { width: 100%; padding: 11px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; margin: 12px -16px 0; padding: 0 16px 4px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; padding: 7px 12px; }
+  .answer-head, .answer-body > div { padding: 16px; }
+  .answer-head .a { font-size: 17px; }
+  details.sql summary { padding: 12px 16px; }
+  details.sql pre { padding: 12px 16px 14px; font-size: 12px; }
+  .sql-actions { padding: 0 16px 14px; }
+  .bigno { font-size: 38px; }
+  .tablewrap { max-height: 320px; }
+  table.data th, table.data td { padding: 7px 10px; }
+  .digest-head > div { padding: 18px 16px; }
+  .digest-head h2 { font-size: 19px; }
+  .kpis { gap: 10px; }
+  .kpi { padding: 12px 12px 10px; }
+  .kpi .v { font-size: 21px; }
+  .kpi .tag { display: block; margin: 2px 0 0; }
+  .pad { padding: 16px; }
+  .dict dl { grid-template-columns: 1fr; gap: 2px; }
+  .dict dd { margin-bottom: 8px; }
+  #toasts { left: 16px; right: 16px; bottom: 16px; }
+}
+@media (max-width: 359px) { .kpis { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -291,12 +340,14 @@ table.data tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft)
 
   // ------------------------------------------------------------ charts (inline SVG, no libraries)
   function barChart(labels, values) {
-    const max = Math.max(...values.map(Math.abs), 1), rowH = 26, labelW = 150, w = 520;
+    // A narrower drawing on phones keeps the 12px labels readable once the SVG is scaled to fit.
+    const narrow = window.matchMedia("(max-width: 600px)").matches;
+    const max = Math.max(...values.map(Math.abs), 1), rowH = 26, labelW = narrow ? 112 : 150, w = narrow ? 330 : 520;
     const svg = el("svg", { viewBox: `0 0 ${w} ${labels.length * rowH + 4}`, role: "img", style: "width:100%;height:auto" });
     labels.forEach((lab, i) => {
-      const y = i * rowH, bw = Math.max(2, (Math.abs(values[i]) / max) * (w - labelW - 70));
+      const y = i * rowH, bw = Math.max(2, (Math.abs(values[i]) / max) * (w - labelW - (narrow ? 50 : 70)));
       svg.append(
-        el("text", { x: 0, y: y + 17, "font-size": 12, fill: "var(--ink-2)" }, String(lab).slice(0, 22)),
+        el("text", { x: 0, y: y + 17, "font-size": 12, fill: "var(--ink-2)" }, String(lab).slice(0, narrow ? 16 : 22)),
         el("rect", { x: labelW, y: y + 5, width: bw, height: 16, rx: 3, fill: i === 0 ? "var(--chart)" : "var(--chart-2)" }),
         el("text", { x: labelW + bw + 6, y: y + 17, "font-size": 12, fill: "var(--ink)" }, fmtNum(values[i])));
     });
